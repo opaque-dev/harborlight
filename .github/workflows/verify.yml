@@ -35,7 +35,7 @@ jobs:
           # Pin the release: deterministic, and skips the unauthenticated
           # GitHub API latest-release lookup that rate-limits on shared
           # runners. Bump on new Opaque releases.
-          OPAQUE_VERSION: "0.4.0"
+          OPAQUE_VERSION: "0.5.0"
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
