@@ -27,13 +27,6 @@ act3_main() {
   # HARBORLIGHT_SOURCE_TOKEN from a daemon-side reference. Your shell does not
   # carry it and the CLI never sees it. Success proves the injection: without
   # the token the analyst exits non-zero.
-  if [[ "$(uname)" != "Darwin" ]]; then
-    echo 'Linux note: this run disables the OS sandbox layer (sandbox = false).'
-    echo 'Opaque 0.4.0 applies Landlock and seccomp to the sandbox wrapper itself,'
-    echo 'which then cannot finish its own setup; reported upstream. Broker'
-    echo 'custody, policy, approval, injection and audit below are unchanged.'
-    echo
-  fi
   # shellcheck disable=SC2016  # banner prints literally; expansion is the bug class we avoid
   echo '$ ANALYST_PYTHON="$(xcrun --find python3)"   # a concrete interpreter; the /usr/bin shim cannot run sandboxed'
   ANALYST_PYTHON="$(resolve_analyst_python)"
@@ -49,10 +42,15 @@ act3_main() {
   echo
 
   # Act 1's careless argv, revisited. An earlier Opaque persisted the full
-  # command line in this record; 0.4.0 records only the argument count.
+  # command line in this record; since 0.4.0 it records only the argument
+  # count, and 0.6.0 adds the sandbox strategy that actually ran.
   # Audit metadata remains sensitive even when it contains no secret values.
   run sqlite3 "$HOME/.opaque/audit.db" \
     "select kind, detail from audit_events where kind='sandbox.created' order by rowid desc limit 1;"
+
+  echo 'argument_count keeps the argv out of the audit database. sandbox= names'
+  echo 'the platform layer that ran: seatbelt on macOS, bubblewrap or unshare'
+  echo 'with landlock and seccomp on Linux, none for a profile with sandbox = false.'
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

@@ -109,19 +109,12 @@ ensure_initialized() {
   echo
 
   # Install the analyst sandbox profile with this checkout's path filled in.
+  # The platform sandbox stays on: seatbelt on macOS, bubblewrap (or unshare)
+  # with Landlock and seccomp on Linux. The daemon names the strategy it used
+  # in the sandbox.created audit row, and Act 3 reads that row back.
   mkdir -p "$HOME/.opaque/profiles"
-  if [[ "$(uname)" == "Darwin" ]]; then
-    sed "s|__REPO_DIR__|$HARBORLIGHT_REPO|" \
-      "$HARBORLIGHT_REPO/profiles/analyst.toml" > "$HOME/.opaque/profiles/analyst.toml"
-  else
-    # Opaque 0.4.0 applies Landlock and seccomp to the sandbox wrapper itself,
-    # so bwrap and unshare cannot finish their own setup: every
-    # platform-sandboxed exec fails on a Landlock-capable Linux kernel
-    # (reported upstream). Disable the OS sandbox layer; broker custody,
-    # policy, approval, secret injection and audit are unchanged.
-    sed "s|__REPO_DIR__|$HARBORLIGHT_REPO|; s|^name = \"analyst\"|name = \"analyst\"\nsandbox = false  # Linux: 0.4.0 platform sandbox broken, reported upstream|" \
-      "$HARBORLIGHT_REPO/profiles/analyst.toml" > "$HOME/.opaque/profiles/analyst.toml"
-  fi
+  sed "s|__REPO_DIR__|$HARBORLIGHT_REPO|" \
+    "$HARBORLIGHT_REPO/profiles/analyst.toml" > "$HOME/.opaque/profiles/analyst.toml"
 
   run opaque policy check
 }
