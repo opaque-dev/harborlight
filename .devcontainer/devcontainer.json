@@ -11,7 +11,7 @@
     "install-opaque": "curl -sSfL https://raw.githubusercontent.com/opaque-dev/opaque/main/install.sh -o /tmp/opaque-install.sh && sudo env OPAQUE_INSTALL=/usr/local/bin sh /tmp/opaque-install.sh && rm /tmp/opaque-install.sh && opaque --version"
   },
   "waitFor": "onCreateCommand",
-  "postAttachCommand": "printf '\\nHarborlight quickstart — run: ./quickstart.sh --ci\\n\\nA codespace has no biometric approver, so CI mode is the path here. Approvals\\nare synthetic, loudly announced, and attributed to \"insecure-auto-approve\" in\\nthe audit record. Never use that mode in production. The native-approval\\nstory needs a macOS or Linux desktop: see Act 3 in the README.\\n\\nKnown limit: on kernels without the landlock LSM (Docker Desktop on macOS),\\nAct 3'\"'\"'s sandboxed run fails closed. Codespaces kernels carry landlock.\\n\\n'",
+  "postAttachCommand": "printf '\\nHarborlight quickstart — run: ./quickstart.sh --ci\\n\\nA codespace has no biometric approver, so CI mode is the path here. Approvals\\nare synthetic, loudly announced, and attributed to \"insecure-auto-approve\" in\\nthe audit record. Never use that mode in production. The native-approval\\nstory needs a macOS or Linux desktop: see Act 3 in the README.\\n\\nAct 3 runs the real Linux sandbox (Opaque 0.6.0 or later). The daemon names\\nthe strategy it used in the sandbox.created audit row; on a kernel without the\\nlandlock LSM it drops that layer and says so instead of failing closed.\\n\\n'",
   "customizations": {
     "vscode": {
       "extensions": ["timonwong.shellcheck"]

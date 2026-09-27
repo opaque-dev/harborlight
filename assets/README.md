@@ -3,7 +3,8 @@
 `demo.gif` (light) and `demo-dark.gif` (dark) are rendered from `demo.cast`,
 a real terminal session against the released Opaque package in a throwaway
 `HOME`. Every value that looks like a secret in the recording is a dummy
-value, and Harborlight is a fictional lender.
+value, and Harborlight is a fictional lender. It was recorded against
+Opaque 0.4.0 and has not been re-recorded for 0.6.0.
 
 The recording runs in CI mode (`insecure_auto_approve`), so no native
 approval prompt appears; the on-screen banner states this and the mode is

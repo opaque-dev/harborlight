@@ -54,6 +54,13 @@ or
 curl -sSfL https://raw.githubusercontent.com/opaque-dev/opaque/main/install.sh | sh
 ```
 
+On Linux, Act 3's sandbox needs the `bubblewrap` package, and Acts 3 and 4
+read the audit database with `sqlite3`:
+
+```sh
+sudo apt-get install -y bubblewrap sqlite3   # Debian/Ubuntu
+```
+
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/opaque-dev/harborlight)
 
 No local install needed: a codespace comes with Opaque preinstalled. Run
@@ -237,26 +244,32 @@ classified as an agent, and an agent gets exit code and byte lengths, not the
 approval on every call, no lease. On Linux, skip the `xcrun` line and use
 `python3` directly.
 
-One Linux honesty note. Opaque 0.4.0 applies its Landlock and seccomp
-restrictions to the sandbox wrapper itself, and the wrapper then cannot
-finish its own setup: every platform-sandboxed exec fails on a
-Landlock-capable kernel. We reported it upstream. Until the fix ships,
-the scripts set `sandbox = false` on Linux; the broker path you just
-watched — policy, approval, injection by reference, withheld output,
-the audit record — is unchanged. macOS runs the real seatbelt sandbox.
+macOS runs the seatbelt sandbox. Linux needs one namespace wrapper, and
+`bubblewrap` is the one to install: on Ubuntu 24.04 its package ships the
+AppArmor profile that lets `bwrap` create user namespaces, which are otherwise
+restricted there. The daemon probes the kernel for Landlock and seccomp, drops
+a layer it cannot build with a warning rather than silently, and when no
+wrapper works it refuses the exec before spawning anything, with the reason in
+the error. Opaque 0.6.0 fixed this path; 0.4.0 and 0.5.0 failed every
+platform-sandboxed exec closed on Linux
+([#123](https://github.com/opaque-dev/opaque/issues/123), closed), and this
+quickstart used to disable the sandbox layer there.
 
 One more callback. The careless argv from Act 1 is a habit the broker's own
 records used to have:
 
 ```text
 $ sqlite3 "$HOME/.opaque/audit.db" "select kind, detail from audit_events where kind='sandbox.created' order by rowid desc limit 1;"
-sandbox.created|profile=analyst argument_count=3
+sandbox.created|profile=analyst argument_count=3 sandbox=seatbelt
 ```
 
-An earlier Opaque persisted the full command line in this record; 0.4.0
-records the argument count and keeps the argv out of its own database. The
+An earlier Opaque persisted the full command line in this record; since 0.4.0
+it records the argument count and keeps the argv out of its own database. The
 principle survives the fix: audit metadata remains sensitive even when it
-contains no secret values.
+contains no secret values. The `sandbox=` field is new in 0.6.0 and names the
+platform layer that actually ran: `seatbelt` here, `bubblewrap+landlock+seccomp`
+on a Linux host with `bwrap` and a Landlock kernel, `none` for a profile with
+`sandbox = false`. No layer is dropped without leaving that mark.
 
 ## Act 4 — The receipt
 
@@ -500,10 +513,10 @@ use it in production.
 
 The [verify workflow](.github/workflows/verify.yml) runs the whole story
 against the released package on Linux and macOS on every push and weekly,
-and asserts the leak, the deny, the sandboxed run, the intact chain, the
-tamper detection, the synthetic-approver attribution, and the bounded-task
-allowance and revoke. If this README drifts from the product, the badge goes
-red. CI runs Act 5 with `--mock` (no Vault install on the runner); the real
+and asserts the leak, the deny, the sandboxed run and the strategy its audit
+row names, the intact chain, the tamper detection, the synthetic-approver
+attribution, and the bounded-task allowance and revoke. If this README drifts
+from the product, the badge goes red. CI runs Act 5 with `--mock` (no Vault install on the runner); the real
 Vault path is the default when you run it locally.
 
 ## Graduate
@@ -577,6 +590,9 @@ numbers in the checked-in CSV, and CI regenerates the file to prove it.
 
 ## License
 
-This quickstart is Apache-2.0. Opaque itself is
-[BUSL-1.1](https://github.com/opaque-dev/opaque/blob/main/LICENSE),
-free for teams of up to 10 developers.
+This quickstart is Apache-2.0. Since 0.6.0, Opaque's public core is
+[Apache-2.0](https://github.com/opaque-dev/opaque/blob/main/LICENSE) for code
+and [CC BY 4.0](https://github.com/opaque-dev/opaque/blob/main/LICENSE-DOCS)
+for documentation, and the release archives carry `LICENSE`, `LICENSE-DOCS`
+and `NOTICE`. Earlier releases keep the BUSL-1.1 license they shipped with;
+see [docs/licensing.md](https://github.com/opaque-dev/opaque/blob/main/docs/licensing.md).
