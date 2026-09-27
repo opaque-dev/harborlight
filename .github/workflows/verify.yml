@@ -29,9 +29,10 @@ jobs:
           bwrap --version
           echo "kernel LSMs: $(cat /sys/kernel/security/lsm)"
           # Ubuntu 24.04 restricts unprivileged user namespaces through
-          # AppArmor. On this runner the bubblewrap package's profile was not
-          # enough: the daemon's bwrap probe died at "loopback: Failed
-          # RTM_NEWADDR: Operation not permitted" and unshare at "write failed
+          # AppArmor, and the bubblewrap package on this runner installs no
+          # AppArmor profile that would exempt bwrap. Without the sysctl the
+          # daemon's bwrap probe died at "loopback: Failed RTM_NEWADDR:
+          # Operation not permitted" and unshare at "write failed
           # /proc/self/uid_map". The daemon's refusal names the remedy below;
           # the probes on either side of it document the effect in the log.
           probe() {
@@ -90,7 +91,7 @@ jobs:
           grep -F 'Sandbox exec succeeded' transcript.txt
           # The platform sandbox ran, and the audit row names the strategy.
           if [ "$RUNNER_OS" = Linux ]; then
-            grep -E 'sandbox\.created\|profile=analyst argument_count=3 sandbox=(bubblewrap|unshare)\+landlock\+seccomp' transcript.txt
+            grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=bubblewrap+landlock+seccomp' transcript.txt
           else
             grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=seatbelt' transcript.txt
           fi

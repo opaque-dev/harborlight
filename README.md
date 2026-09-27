@@ -55,10 +55,13 @@ curl -sSfL https://raw.githubusercontent.com/opaque-dev/opaque/main/install.sh |
 ```
 
 On Linux, Act 3's sandbox needs the `bubblewrap` package, and Acts 3 and 4
-read the audit database with `sqlite3`:
+read the audit database with `sqlite3`. Ubuntu 24.04 also restricts
+unprivileged user namespaces through AppArmor, which blocks both sandbox
+wrappers until the sysctl below is set:
 
 ```sh
-sudo apt-get install -y bubblewrap sqlite3   # Debian/Ubuntu
+sudo apt-get install -y bubblewrap sqlite3                   # Debian/Ubuntu
+sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0   # Ubuntu 24.04
 ```
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/opaque-dev/harborlight)
@@ -245,13 +248,16 @@ approval on every call, no lease. On Linux, skip the `xcrun` line and use
 `python3` directly.
 
 macOS runs the seatbelt sandbox. Linux needs one namespace wrapper, and
-`bubblewrap` is the one to install: on Ubuntu 24.04 its package ships the
-AppArmor profile that lets `bwrap` create user namespaces, which are otherwise
-restricted there. The daemon probes the kernel for Landlock and seccomp, drops
-a layer it cannot build with a warning rather than silently, and when no
-wrapper works it refuses the exec before spawning anything, with the reason in
-the error. Opaque 0.6.0 fixed this path; 0.4.0 and 0.5.0 failed every
-platform-sandboxed exec closed on Linux
+`bubblewrap` is the one to install. The daemon probes both wrappers and the
+kernel's Landlock and seccomp support, drops a layer it cannot build with a
+warning rather than silently, and when no wrapper works it refuses the exec
+before spawning anything, with the reason in the error. On GitHub's
+ubuntu-24.04 runner that refusal read `bwrap: loopback: Failed RTM_NEWADDR:
+Operation not permitted` and `unshare: write failed /proc/self/uid_map` until
+`kernel.apparmor_restrict_unprivileged_userns` was set to 0, which the error
+text itself suggests; the bubblewrap package there installs no AppArmor
+profile that would exempt `bwrap`. Opaque 0.6.0 fixed this path; 0.4.0 and
+0.5.0 failed every platform-sandboxed exec closed on Linux
 ([#123](https://github.com/opaque-dev/opaque/issues/123), closed), and this
 quickstart used to disable the sandbox layer there.
 
