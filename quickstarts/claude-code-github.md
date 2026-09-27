@@ -38,15 +38,34 @@ Code, using the absolute path from `command -v opaque-mcp`:
 ```
 
 Copy [mcp/mcp.json.example](../mcp/mcp.json.example) and adjust the path.
-The server takes no arguments. In 0.4.0, `opaque connect` writes a
-configuration the MCP server rejects; write the file yourself. The
+The server takes no arguments; `--stdio` is accepted and changes nothing. The
 equivalent CLI form is `claude mcp add opaque -s project -- "$(command -v opaque-mcp)"`
 — this matches `claude mcp add --help`, and the file above is what it produces.
 
+Since 0.6.0, `opaque connect claude` can write the entry for you. It
+registers the server in your user-scope `~/.claude.json` with the absolute
+path of `opaque-mcp` and an empty `args` list, merges into whatever servers
+that file already holds, and on a second run reports that the entry exists
+instead of rewriting it. Captured against 0.6.0:
+
+```text
+$ opaque connect claude
+✔  Registered opaque MCP server with Claude Code
+$ opaque connect claude
+ℹ  opaque MCP server is already configured in Claude Code
+```
+
+In 0.4.0 this command wrote a configuration the adapter rejected
+([#110](https://github.com/opaque-dev/opaque/issues/110), closed), which is
+why this page used to insist on the hand-written file.
+
 Start the daemon if it is not running, then restart Claude Code in that
 project and check the connection with `/mcp`. The adapter identifies itself
-as `opaque-mcp 0.4.0+1fc32e3` and publishes 24 tools, including
-`opaque_github_set_actions_secret`.
+as `opaque-mcp 0.6.0+7067aa0` and lists 22 tools against this daemon,
+including `opaque_github_set_actions_secret`. The list is what the connected
+daemon serves: 0.4.0 advertised 24, two of them signed-contract tools this
+daemon does not run
+([#120](https://github.com/opaque-dev/opaque/issues/120), closed).
 
 ## 2. First tool calls, zero credentials
 
@@ -79,7 +98,13 @@ opaque_secrets_status {"profile": "analyst"}
 
 `opaque_secrets_status` parses configuration only: names, schemes, and
 references. The agent learns what a profile can inject and nothing about the
-values behind it.
+values behind it. A malformed call is refused with the failing field named,
+so the agent corrects itself instead of guessing:
+
+```text
+opaque_secrets_status {}
+{"code": -32602, "message": "tool arguments do not match the input schema: missing required field \"/profile\""}
+```
 
 ## 3. Preview a publish, still zero credentials
 
@@ -171,7 +196,7 @@ outside that boundary.
 ---
 
 Steps 1–3 were verified against a live `opaqued` and `opaque-mcp`
-0.4.0+1fc32e3 on 2026-09-16; the JSON outputs above are captured, not
+0.6.0+7067aa0 on 2026-09-26; the JSON outputs above are captured, not
 composed. Step 4 follows the
 [core tutorial](https://github.com/opaque-dev/opaque/blob/main/docs/tutorial.md)
 and needs your own disposable token and test repository.
