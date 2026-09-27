@@ -24,18 +24,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y sqlite3
-          # No bubblewrap: the acts set sandbox = false on Linux because
-          # Opaque 0.4.0's platform sandbox cannot start under its own
-          # Landlock/seccomp layering (reported upstream). Reinstall
-          # bubblewrap and drop the profile override once the fix ships.
+          # bubblewrap is the namespace wrapper behind Act 3's sandbox. Its
+          # package ships the AppArmor profile that lets bwrap create user
+          # namespaces on Ubuntu 24.04, where they are otherwise restricted;
+          # the unshare fallback would instead need
+          # sysctl kernel.apparmor_restrict_unprivileged_userns=0.
+          sudo apt-get install -y sqlite3 bubblewrap
+          bwrap --version
+          echo "kernel LSMs: $(cat /sys/kernel/security/lsm)"
 
       - name: Install Opaque (released package)
         env:
           # Pin the release: deterministic, and skips the unauthenticated
           # GitHub API latest-release lookup that rate-limits on shared
           # runners. Bump on new Opaque releases.
-          OPAQUE_VERSION: "0.5.0"
+          OPAQUE_VERSION: "0.6.0"
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
@@ -70,6 +73,12 @@ jobs:
           grep -F 'demo_value_123456' transcript.txt
           grep -F 'unavailable (0 samples)' transcript.txt
           grep -F 'Sandbox exec succeeded' transcript.txt
+          # The platform sandbox ran, and the audit row names the strategy.
+          if [ "$RUNNER_OS" = Linux ]; then
+            grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=bubblewrap+landlock+seccomp' transcript.txt
+          else
+            grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=seatbelt' transcript.txt
+          fi
           grep -F 'code: policy_denied' transcript.txt
           grep -F 'Audit chain intact' transcript.txt
           grep -F 'TAMPER DETECTED' transcript.txt
@@ -79,6 +88,10 @@ jobs:
           grep -F 'refused: the manifest authorized one write' transcript.txt
           grep -F 'refused: revocation blocks a task that has not run' transcript.txt
           grep -F 'INSECURE TEST APPROVAL' transcript.txt
+
+      - name: Show the sandbox probe and strategy the daemon logged
+        if: always() && runner.os == 'Linux'
+        run: grep -F 'linux sandbox' opaqued.log || echo 'no linux sandbox lines in the daemon log'
 
       - name: Diagnose on failure
         if: failure()
