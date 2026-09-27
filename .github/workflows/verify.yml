@@ -24,14 +24,29 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # bubblewrap is the namespace wrapper behind Act 3's sandbox. Its
-          # package ships the AppArmor profile that lets bwrap create user
-          # namespaces on Ubuntu 24.04, where they are otherwise restricted;
-          # the unshare fallback would instead need
-          # sysctl kernel.apparmor_restrict_unprivileged_userns=0.
+          # bubblewrap is the namespace wrapper behind Act 3's sandbox.
           sudo apt-get install -y sqlite3 bubblewrap
           bwrap --version
           echo "kernel LSMs: $(cat /sys/kernel/security/lsm)"
+          # Ubuntu 24.04 restricts unprivileged user namespaces through
+          # AppArmor. On this runner the bubblewrap package's profile was not
+          # enough: the daemon's bwrap probe died at "loopback: Failed
+          # RTM_NEWADDR: Operation not permitted" and unshare at "write failed
+          # /proc/self/uid_map". The daemon's refusal names the remedy below;
+          # the probes on either side of it document the effect in the log.
+          probe() {
+            echo "--- $1 ---"
+            bwrap --unshare-all --ro-bind / / --dev /dev --proc /proc /bin/true \
+              && echo 'bwrap --unshare-all: OK' || echo "bwrap --unshare-all: exit $?"
+            unshare --user --map-root-user --mount --pid --net --fork /bin/true \
+              && echo 'unshare user/mount/pid/net: OK' || echo "unshare user/mount/pid/net: exit $?"
+          }
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+          ls /etc/apparmor.d | grep -i bwrap || echo 'no bwrap AppArmor profile file'
+          sudo aa-status 2>/dev/null | grep -i bwrap || echo 'no bwrap profile loaded'
+          probe 'before sysctl'
+          sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+          probe 'after sysctl'
 
       - name: Install Opaque (released package)
         env:
@@ -75,7 +90,7 @@ jobs:
           grep -F 'Sandbox exec succeeded' transcript.txt
           # The platform sandbox ran, and the audit row names the strategy.
           if [ "$RUNNER_OS" = Linux ]; then
-            grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=bubblewrap+landlock+seccomp' transcript.txt
+            grep -E 'sandbox\.created\|profile=analyst argument_count=3 sandbox=(bubblewrap|unshare)\+landlock\+seccomp' transcript.txt
           else
             grep -F 'sandbox.created|profile=analyst argument_count=3 sandbox=seatbelt' transcript.txt
           fi
